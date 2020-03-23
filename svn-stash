@@ -21,7 +21,7 @@ usage()
 Available cmds:
 ls      - display all stashed patshes
 show    - view a given patch
-save    - save a new patch or update existing one without file reverting
+save    - save a new patch or update existing one
 apply   - apply a given patch without deleting it
 push    - save a new patch or update existing one and revert files
 pop     - apply a patch and delete it
@@ -330,7 +330,8 @@ _save()
     fi
 
     if [ -f "$revert_list" ]; then
-        if [ -z "${keep}" ]; then
+        if [ -z "${keep}" ] ; then
+           echo "Warning: apply auto revert"
             svn st $(cat "$revert_list" | sort | uniq) | awk '
                 /^[MAD]/  {print substr($0, 9)}
                 /^[ M]M/  {print substr($0, 9)}
@@ -393,15 +394,16 @@ EOF
 }
 
 save_usage="
-Usage: `basename $0` save <name> [-u] [files...]\n
+Usage: `basename $0` save <name> [-uk] [files...]\n
 Where:\n
 name - stash name\n
+-k   - keep files stashed in working directory (do not revert)\n
 -u   - update stash\n
 "
 save()
 {
     [ $# -ge 1 ] || err 1 "$save_usage"
-    _save -k "$@"
+    _save "$@"
 }
 
 push_usage="
@@ -689,7 +691,10 @@ revert()
 
 # Update given stashes
 update_usage="
-Usage: `basename $0` revert <name|number> [additional files...]
+Usage: `basename $0` update <name|number> [-k] [additional files...]
+Where:\n
+name - stash name\n
+-k   - keep files stashed in working directory (do not revert)\n
 "
 update()
 {
@@ -708,7 +713,7 @@ update()
     shift
     local short=`basename "$patch"`
 
-    _save "$short" -k -u $(cat "$update_list") "$@"
+    _save "$short" -u "$@" $(cat "$update_list")
 }
 
 cmd=$1
