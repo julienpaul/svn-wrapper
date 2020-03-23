@@ -14,20 +14,25 @@ else
 fi
 
 #
+# Setup local var
+#
+export GREP=$(which grep)
+
+#
 # Setup real svn
 #
 ME=$(realpath -sm $0)
-export SVN=$(which -a svn | grep -v "\\$ME" | head -n1)
+export SVN=$(which -a svn | $GREP -v "\\$ME" | head -n1)
 
 #
 # Setup SVN root directory
 #
-export SVN_ROOT=$(env LANG=C $SVN info | grep 'Root Path:' | awk -F: '{print $2}' | xargs)
+export SVN_ROOT=$(env LANG=C $SVN info | $GREP 'Root Path:' | awk -F: '{print $2}' | xargs)
 
 #
 # Setup SVN repository root path
 #
-export SVN_REPO_ROOT=$(env LANG=C $SVN info | grep 'Repository Root:' | awk '{print $3}' | xargs)
+export SVN_REPO_ROOT=$(env LANG=C $SVN info | $GREP 'Repository Root:' | awk '{print $3}' | xargs)
 
 #
 # Hook dirs
@@ -52,7 +57,7 @@ declare -a CMD_LINE
 svn_info_field()
 {
     local field="$1"
-    env LANG=C $SVN info | grep "^$field:" | sed "s|^$field: ||"
+    env LANG=C $SVN info | $GREP "^$field:" | sed "s|^$field: ||"
 }
 
 run_hook()
@@ -97,7 +102,7 @@ run_hooks()
                 [ -f "${branches_file}" ] && cp "${branches_file}" "${branches_file}.tmp"
                 echo "${current_brach}" >> "${branches_file}.tmp"
                 echo "${svn_branch}" >> "${branches_file}.tmp"
-                cat "${branches_file}.tmp" | grep -v '^$' | sort | uniq > "${branches_file}"
+                cat "${branches_file}.tmp" | $GREP -v '^$' | sort | uniq > "${branches_file}"
                 rm "${branches_file}.tmp"
             fi
         fi
@@ -182,7 +187,7 @@ svn_output_filter()
 
             (
             if [ -f "$IGNORES_IN" ]; then
-                cat "$IGNORES_IN" | grep -v '^$' | grep -v '^#' > "$IGNORES"
+                cat "$IGNORES_IN" | $GREP -v '^$' | $GREP -v '^#' > "$IGNORES"
 
                 REAL_PATH="n"
                 if which realpath > /dev/null; then
@@ -202,7 +207,7 @@ svn_output_filter()
                             fn=`realpath -m --relative-to="$SVN_ROOT" -s -q "$fn"`
                             #set +x
                         fi
-                        echo $fn | grep -f "$IGNORES" > /dev/null || echo "$line"
+                        echo $fn | $GREP -f "$IGNORES" > /dev/null || echo "$line"
                     else
                         echo "$line"
                     fi
@@ -253,7 +258,7 @@ CMD_LINE=( "${CMD_LINE[@]}" "$@" )
 #set -x
 
 # detects svn-internal commands
-non_internal=`LANG=C $SVN help "$action" 2>&1 | grep ': unknown command'`
+non_internal=`LANG=C $SVN help "$action" 2>&1 | $GREP ': unknown command'`
 non_external=`which "svn-$action" 2>/dev/null`
 if [ -z "$non_internal" -o -z "$non_external" ]; then
     if [ -z "$non_internal" ]; then
