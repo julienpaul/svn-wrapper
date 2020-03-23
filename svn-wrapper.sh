@@ -12,8 +12,6 @@ else
     export IS_TERMINAL=0
 fi
 
-export GREP=$(which grep)
-
 #
 # Setup local var
 #
@@ -24,6 +22,11 @@ export GREP=$(which grep)
 #
 ME=$(realpath -sm $0)
 export SVN=$(which -a svn | $GREP -v "\\$ME" | head -n1)
+
+#
+# Setup SVN wrapper directory
+#
+export SVN_WRAPPER=$(dirname $ME)
 
 #
 # Setup SVN root directory
@@ -71,6 +74,14 @@ export SVN_ROOT=$(_svn_root)
 # Setup SVN repository root path
 #
 export SVN_REPO_ROOT=$(env LANG=C $SVN info | $GREP 'Repository Root:' | awk '{print $3}' | xargs)
+#
+# Setup SVN repository url
+#
+export SVN_URL=$(env LANG=C $SVN info | $GREP 'URL:' | awk '{print $2}' | xargs)
+#
+# Setup SVN revision
+#
+export SVN_REV=$(env LANG=C $SVN info | $GREP 'Revision:' | awk '{print $2}' | xargs)
 
 #
 # Hook dirs
@@ -131,12 +142,12 @@ run_hooks()
                     break
                 fi
             done
-            
+ 
             if [ -n "${svn_branch}" ]; then
                 local current_branch=$(svn_info_field 'Relative URL')
                 local svn_repo_hash=$(sha256sum <<< "$SVN_REPO_ROOT" | awk '{print $1}')
                 local branches_file="$HOME/.subversion/branches-${svn_repo_hash}.txt"
-                
+ 
                 [ -f "${branches_file}" ] && cp "${branches_file}" "${branches_file}.tmp"
                 echo "${current_brach}" >> "${branches_file}.tmp"
                 echo "${svn_branch}" >> "${branches_file}.tmp"
@@ -272,6 +283,14 @@ svn_output_filter()
 #
 action=$1
 
+echo -e "\nSVN            : $SVN"
+echo -e "SVN_WRAPPER    : $SVN_WRAPPER"
+echo -e "SVN_ROOT       : $SVN_ROOT"
+echo -e "SVN_BRANCHE    : $SVN_BRANCHE"
+echo -e "SVN_REPO_ROOT  : $SVN_REPO_ROOT"
+echo -e "SVN_REPO_URL   : $SVN_URL"
+echo -e "HOOK_DIR       : $HOOK_DIR\n"
+echo -e "Revision       : $SVN_REV\n"
 #
 # Pre-hooks
 #
