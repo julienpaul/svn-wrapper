@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+set -e
+
+action="$1"
+exit_status="$2"
+shift 2
+
+case "$action" in
+    *)
+        echo "Pre-hook for action '$action'"
+        # Checks the commit message
+        $HOOK_DIR/mine/check-msg.sh "$@"
+        # Add log message to siren change log file
+        echo "$HOOK_DIR/mine/siren-changelog.sh" "$@"
+        $HOOK_DIR/mine/siren-changelog.sh "$@"
+        # force commit some siren file with svn keyword
+        $HOOK_DIR/mine/siren-keyword.sh
+        exit 0
+    ;;
+esac
+
+exit 0
