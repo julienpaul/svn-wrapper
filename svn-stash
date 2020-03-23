@@ -39,14 +39,14 @@ export LC_ALL=C
 
 [ -x `which svn` ] || err 1 "svn is not installed on this system"
 svnrp=$(svn info 2>&1 | sed -n 's/Working Copy Root Path: \(.*\)/\1/p')
-svnrev=$(svn info 2>&1 | grep '^Revision: ' | cut -d ' ' -f 2)
+svnrev=$(svn info 2>&1 | $GREP '^Revision: ' | cut -d ' ' -f 2)
 
 [ -d "${svnrp}" ] || err 1 "should be used inside a working copy"
 [ -w "${svnrp}/.svn" ] || err 1 "no write access to ${svnrp}/.svn"
 
 patchdir=${svnrp}/.svn/patches
-#svnstrip=$(svn info | grep 'Relative URL:' | awk -F: '{print $2}' | xargs | tr -dc / | wc -c)
-svnrelative=$(svn info | grep 'Relative URL:' | awk -F: '{print $2}' | xargs)
+#svnstrip=$(svn info | $GREP 'Relative URL:' | awk -F: '{print $2}' | xargs | tr -dc / | wc -c)
+svnrelative=$(svn info | $GREP 'Relative URL:' | awk -F: '{print $2}' | xargs)
 
 mkdir -p "${patchdir}" || err 1 "Impossible to create the patch directory"
 
@@ -57,7 +57,7 @@ mkdir -p "${patchdir}" || err 1 "Impossible to create the patch directory"
 
 _svn_strip_count()
 {
-    svn info | grep 'Relative URL:' | awk -F: '{print $2}' | xargs | tr -dc / | wc -c
+    svn info | $GREP 'Relative URL:' | awk -F: '{print $2}' | xargs | tr -dc / | wc -c
 }
 
 _vcs_git_update()
@@ -124,7 +124,7 @@ _history_restore_script()
     local changes
     changes="$1"
 
-    cat "${changes}" | grep -A1 '^copy from ' | awk -v rel="${svnrelative}" '
+    cat "${changes}" | $GREP -A1 '^copy from ' | awk -v rel="${svnrelative}" '
         BEGIN {
             from = "";
             to = "";
@@ -304,7 +304,7 @@ _save()
         #      meta data can be changed
         if [ "$type" != "?" ]; then
             if [ "$enc" = "binary" ]; then
-                mime=`svn propget svn:mime-type "${file}" 2>&1 | grep -v '^svn:'`
+                mime=`svn propget svn:mime-type "${file}" 2>&1 | $GREP -v '^svn:'`
                 if [ -z "$mime" ]; then
                     # Force set binary property for valid work `svn diff --git`
                     svn propset svn:mime-type application/octet-stream "${file}"
@@ -332,11 +332,11 @@ _save()
             svn st $(cat "$revert_list" | sort | uniq) | awk '
                 /^[MAD]/  {print substr($0, 9)}
                 /^[ M]M/  {print substr($0, 9)}
-            ' | xargs -I{} svn revert {}
+            ' | xargs -I {} svn revert {}
 
             svn st $(cat "$revert_list" | sort | uniq) | awk '
                 /^[?]/ {print substr($0, 9)}
-            ' | xargs -I{} rm -fv {}
+            ' | xargs -I {} rm -fv {}
         fi
     fi
 
@@ -364,7 +364,7 @@ To apply this patch manually, do next steps:
   4. Restore untracked and binary files from the "others/" directory. This directory keeps valid
      files subpath:
 
-      cat others.list | xargs -I{} | cp others/{} {}
+      cat others.list | xargs -I {} | cp others/{} {}
 
   5. Restore work revision and solve conflicts:
       svn up
@@ -430,7 +430,7 @@ _get_patch()
         return 0
     fi
 
-    nm=$(list | grep "^$1" | awk '{print $2}')
+    nm=$(list | $GREP "^$1" | awk '{print $2}')
     [ -z "$nm" ] && return 1
     echo "$patchdir/$nm"
 }
@@ -480,7 +480,7 @@ _apply_lite2() {
     #svn patch --dry-run --strip ${svnstrip} "${changes}"
 
     patch_rev=$(cat "$patch/rev")
-    work_rev="$(svn info | grep '^Revision:' | awk '{print $2}')"
+    work_rev="$(svn info | $GREP '^Revision:' | awk '{print $2}')"
 
     files=""
     [ -f "${diff_list}" ] && files="$(cat "${diff_list}")"
@@ -526,7 +526,7 @@ _vcs_apply()
     #set -x
 
     # Check for reference
-    is_ref=`echo "$1" | grep '^@{[0-9]\+}$' || true`
+    is_ref=`echo "$1" | $GREP '^@{[0-9]\+}$' || true`
     if [ -z "$is_ref" ]; then
         # Cut @ from name
         name=`echo "$1" | cut -d '@' -f 1`
@@ -678,11 +678,11 @@ revert()
     svn st $(cat "$revert_list") | awk '
         /^[MAD]/  {print substr($0, 9)}
         /^[ M]M/  {print substr($0, 9)}
-    ' | xargs -I{} svn revert {}
+    ' | xargs -I {} svn revert {}
 
     svn st $(cat "$revert_list") | awk '
         /^[?]/ {print substr($0, 9)}
-    ' | xargs -I{} rm -fv {}
+    ' | xargs -I {} rm -fv {}
 }
 
 # Update given stashes
