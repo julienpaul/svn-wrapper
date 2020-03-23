@@ -265,7 +265,9 @@ _save()
 
     revert_list="${patch}/revert.list.tmp"
 
-    rm -f "${others}" "${diff_list}" "${revert_list}"
+    if [[ $updating == 1 ]]; then
+       rm -f "${others}" "${revert_list}"
+    fi
 
     echo ${svnrev} > "${rev}"
     svn st ${st_opt} ${files} | while IFS='' read line
@@ -321,9 +323,9 @@ _save()
 
     # Process lists
     if [ -f "$diff_list" ]; then
-        svn diff --git $(cat "$diff_list") > "${diff}"
-        _history_restore_script "${diff}" > "${hist_script}"
-        _fix_svn_git_patch "${diff}" > "${diff_fixed}"
+        svn diff --git $(cat "$diff_list") >> "${diff}"
+        _history_restore_script "${diff}" >> "${hist_script}"
+        _fix_svn_git_patch "${diff}" >> "${diff_fixed}"
         cat "$diff_list" >> "$revert_list"
     fi
 
@@ -697,7 +699,7 @@ update()
 
     others="${patch}/others.list"
     diff_list="${patch}/diff.list"
-    update_list="${patch}/revert.list.tmp"
+    update_list="${patch}/update.list.tmp"
 
     trap "rm -f '$update_list'" RETURN
 
