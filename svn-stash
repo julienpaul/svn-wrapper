@@ -22,7 +22,7 @@ Available cmds:
 ls      - display all stashed patshes
 show    - view a given patch
 save    - save a new patch or update existing one
-apply   - apply a given patch without deleting it
+apply   - apply a given patch
 pop     - apply a patch and delete it
 rm      - delete a given patch from the queue
 log     - show history for VCSes stashes
@@ -554,7 +554,7 @@ _vcs_apply()
 
 apply()
 {
-    [ $# -eq 1 ] || err 1 "Usage: `basename $0` apply <name[@REV]|reference>"
+    [ $# -ge 1 ] || err 1 "Usage: `basename $0` apply <name[@REV]|reference> [files...]"
     _vcs_apply "$@"
     exit 0
 }
