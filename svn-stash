@@ -38,15 +38,15 @@ help    - show help" >&2
 export LC_ALL=C
 
 [ -x `which svn` ] || err 1 "svn is not installed on this system"
+svnroot=$(svn info 2>&1 | sed -n 's/Repository Root: \(.*\)/\1/p')
 svnrp=$(svn info 2>&1 | sed -n 's/Working Copy Root Path: \(.*\)/\1/p')
 svnrev=$(svn info 2>&1 | $GREP '^Revision: ' | cut -d ' ' -f 2)
+svnrelative=$(svn info 2>&1 | sed -n 's/URL: \(.*\)/\1/p')
 
 [ -d "${svnrp}" ] || err 1 "should be used inside a working copy"
 [ -w "${svnrp}/.svn" ] || err 1 "no write access to ${svnrp}/.svn"
 
 patchdir=${svnrp}/.svn/patches
-#svnstrip=$(svn info | $GREP 'Relative URL:' | awk -F: '{print $2}' | xargs | tr -dc / | wc -c)
-svnrelative=$(svn info | $GREP 'Relative URL:' | awk -F: '{print $2}' | xargs)
 
 mkdir -p "${patchdir}" || err 1 "Impossible to create the patch directory"
 
@@ -57,7 +57,7 @@ mkdir -p "${patchdir}" || err 1 "Impossible to create the patch directory"
 
 _svn_strip_count()
 {
-    svn info | $GREP 'Relative URL:' | awk -F: '{print $2}' | xargs | tr -dc / | wc -c
+    echo $svnrelative | sed -n "s;$svnroot\(.*\);\1;p" | xargs | tr -dc / | wc -c
 }
 
 _vcs_git_update()
