@@ -246,11 +246,13 @@ svn_output_filter()
                     REAL_PATH="y"
                 fi
 
-                while read line;
+                while IFS='' read line;
                 do
                     # First 8 columns uses for svn status info: 7 info + 1 for space
                     # see `svn help st`
-                    type=`echo $line | cut -c 1`
+                    type=`echo $line | cut -c 1-2`
+                    # Strip trailing space.
+                    type="${type%% }"
                     fn=`echo $line | cut -c 9-`
                     # Process only untracked files
                     if [ "$type" = "?" ]; then
