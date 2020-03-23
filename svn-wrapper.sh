@@ -86,7 +86,7 @@ export SVN_REV=$(env LANG=C $SVN info | $GREP 'Revision:' | awk '{print $2}' | x
 #
 # Hook dirs
 #
-export HOOK_DIR="$SVN_ROOT/.svn/hooks"
+[ -z $SVN_ROOT ] && export HOOK_DIR="${HERE}/$3/.svn/hooks" || export HOOK_DIR="$SVN_ROOT/.svn/hooks"
 
 #
 # PAGER like git
@@ -111,24 +111,27 @@ svn_info_field()
 
 run_hook()
 {
-    local hook=$1
+    local hook="$1"
     shift
-    test -x "$HOOK_DIR/$hook" && "$HOOK_DIR/$hook" "$@" || true
+    test -x "$HOOK_DIR/$hook" && "$HOOK_DIR/$hook" "$action" "$@" || true
 }
 
 run_hooks()
 {
-    local hook_type=$1
-    local action=$2
-    local status=$3
+    local hook_type="$1"
+    local action="$2"
+    local status="$3"
     shift 2
 
     case "$action" in
     up|update)
-        run_hook $hook_type-update "$@"
+        run_hook "$hook_type-update" "$@"
     ;;
     ci|commit)
-        run_hook $hook_type-commit "$@"
+        run_hook "$hook_type-commit" "$@"
+    ;;
+    co|checkout)
+        run_hook "$hook_type-checkout" "$@"
     ;;
     switch)
         #set -x
@@ -158,7 +161,7 @@ run_hooks()
         #set +x
     ;;
     *)
-        run_hook $hook_type-action $action "$@"
+        run_hook "$hook_type-action" "$action" "$@"
     ;;
     esac
 }
@@ -173,7 +176,7 @@ svn_list_branches()
 
 modify_args()
 {
-    local action=$1
+    local action="$1"
     shift
 
     local help_mode=0
@@ -204,7 +207,7 @@ modify_args()
 #set -x
 svn_output_colorer()
 {
-    local CMD=$1
+    local CMD="$1"
     if [ -t 1 ]; then
         (
             case $CMD in
@@ -281,7 +284,7 @@ svn_output_filter()
 #
 # SVN action
 #
-action=$1
+action="$1"
 
 echo -e "\nSVN            : $SVN"
 echo -e "SVN_WRAPPER    : $SVN_WRAPPER"
@@ -294,7 +297,7 @@ echo -e "Revision       : $SVN_REV\n"
 #
 # Pre-hooks
 #
-run_hooks pre "$action"
+run_hooks pre "$action" 0 "$@"
 
 #
 # Modifty command line

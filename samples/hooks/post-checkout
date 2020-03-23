@@ -6,8 +6,6 @@ action=$1
 exit_status=$2
 shift 2
 
-[ $exit_status -eq 0 ] && (cd $SVN_ROOT ; touch CMakeLists.txt)
-
 case "$action" in
     *)
         echo "Post-hook for action '$action'"
