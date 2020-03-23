@@ -23,7 +23,6 @@ ls      - display all stashed patshes
 show    - view a given patch
 save    - save a new patch or update existing one
 apply   - apply a given patch without deleting it
-push    - save a new patch or update existing one and revert files
 pop     - apply a patch and delete it
 rm      - delete a given patch from the queue
 log     - show history for VCSes stashes
@@ -406,18 +405,6 @@ save()
     _save "$@"
 }
 
-push_usage="
-Usage: `basename $0` push <name> [-u] [files...]\n
-Where:\n
-name - stash name\n
--u   - update stash\n
-"
-push()
-{
-    [ $# -ge 1 ] || err 1 "$push_usage"
-    _save "$@"
-}
-
 list()
 {
     ls -t1 ${patchdir} | while read p; do
@@ -721,7 +708,7 @@ cmd=$1
 
 case "$cmd" in
     ls) list "$@" ;;
-    show|save|apply|pop|push|list|log|revert|update) $cmd "$@" ;;
+    show|save|apply|pop|list|log|revert|update) $cmd "$@" ;;
     rm) remove "$@" ;;
     *) usage "$@" ;;
 esac
