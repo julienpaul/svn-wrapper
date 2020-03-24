@@ -291,7 +291,7 @@ action="$1"
 echo -e "\nSVN            : $SVN"
 echo -e "SVN_WRAPPER    : $SVN_WRAPPER"
 echo -e "SVN_ROOT       : $SVN_ROOT"
-echo -e "SVN_BRANCHE    : $SVN_BRANCHE"
+echo -e "SVN_BRANCH     : $SVN_BRANCH"
 echo -e "SVN_REPO_ROOT  : $SVN_REPO_ROOT"
 echo -e "SVN_REPO_URL   : $SVN_URL"
 echo -e "HOOK_DIR       : $HOOK_DIR\n"
@@ -300,7 +300,6 @@ echo -e "Revision       : $SVN_REV\n"
 # Pre-hooks
 #
 run_hooks pre "$action" 0 "$@"
-
 #
 # Modifty command line
 #
@@ -316,8 +315,6 @@ CMD_LINE=( "${CMD_LINE[@]}" "$@" )
 #
 # Real SVN call
 #
-
-#set -x
 
 # detects svn-internal commands
 non_internal=`LANG=C $SVN help "$action" 2>&1 | $GREP ': unknown command'`

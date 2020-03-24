@@ -393,11 +393,11 @@ EOF
 }
 
 save_usage="
-Usage: `basename $0` save <name> [-uk] [files...]\n
-Where:\n
-name - stash name\n
--k   - keep files stashed in working directory (do not revert)\n
--u   - update stash\n
+Usage: `basename $0` save <name> [-uk] [files...]
+Where:
+name - stash name
+-k   - keep files stashed in working directory (do not revert)
+-u   - update stash
 "
 save()
 {
@@ -421,14 +421,19 @@ _get_patch()
         return 0
     fi
 
-    nm=$(list | $GREP "^$1" | awk '{print $2}')
+    nm=$(list | $GREP "^@{$1}" | awk '{print $2}')
     [ -z "$nm" ] && return 1
     echo "$patchdir/$nm"
 }
 
+show_usage="
+Usage: `basename $0` show <name|number>
+Where:
+name|number - stash name or stash number
+"
 show()
 {
-    [ $# -eq 1 ] || err 1 "Usage: `basename $0` show <name|number>"
+    [ $# -eq 1 ] || err 1 "$show_usage"
     patch=$(_get_patch $1)
 
     [ -z "$patch" -o -d "${patch}" ] || err 1 "$1: no such patch"
@@ -552,24 +557,41 @@ _vcs_apply()
     _apply_lite2 "$tmp/$short" "$@"
 }
 
+apply_usage="
+Usage: `basename $0` apply <name[@REV]|number> [files...]
+Where:
+name|number - stash name or stash number
+REV         - revision number
+"
 apply()
 {
-    [ $# -ge 1 ] || err 1 "Usage: `basename $0` apply <name[@REV]|reference> [files...]"
+    [ $# -ge 1 ] || err 1 "$apply_usage"
     _vcs_apply "$@"
     exit 0
 }
 
+pop_usage="
+Usage: `basename $0` pop <name[@REV]|number> [files...]
+Where:
+name|number - stash name or stash number
+REV         - revision number
+"
 pop()
 {
-    [ $# -eq 1 ] || err 1 "Usage: `basename $0` pop <name[@REV]|reference>"
+    [ $# -eq 1 ] || err 1 "$pop_usage"
     _vcs_apply "$@"
     remove $1
     exit 0
 }
 
+remove_usage="
+Usage: `basename $0` rm <name|number> [files...]
+Where:
+name|number - stash name or stash number
+"
 remove()
 {
-    [ $# -eq 1 ] || err 1 "Usage: `basename $0` rm <name|reference>"
+    [ $# -eq 1 ] || err 1 "$remove_usage"
     patch=$(_get_patch $1)
     [ -d "${patch}" ] || err 1 "$1: no such patch"
     name=$(basename "${patch}")
@@ -585,11 +607,11 @@ remove()
 
 # Show log for VCS tracked stash
 log_usage="
-Usage: `basename $0` log <name> [-f][-p] [-- VCS-specific options]\n
-Where:\n
-name - stash name\n
--f   - full log, otherwise shoe only headers\n
--p   - show commit changes\n
+Usage: `basename $0` log <name> [-f][-p] [-- VCS-specific options]
+Where:
+name - stash name
+-f   - full log, otherwise shoe only headers
+-p   - show commit changes
 "
 log()
 {
@@ -642,6 +664,8 @@ log()
 # Revert files affected by Stash
 revert_usage="
 Usage: `basename $0` revert <name|number>
+Where:
+name|number - stash name or stash number
 "
 revert()
 {
@@ -679,9 +703,9 @@ revert()
 # Update given stashes
 update_usage="
 Usage: `basename $0` update <name|number> [-k] [additional files...]
-Where:\n
-name - stash name\n
--k   - keep files stashed in working directory (do not revert)\n
+Where:
+name|number - stash name or stash number
+-k          - keep files stashed in working directory (do not revert)
 "
 update()
 {
