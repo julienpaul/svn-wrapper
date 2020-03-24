@@ -59,8 +59,8 @@ if $msg ; then
 
    # add log message to change log (if not empty)
    # get siren_changelog file
-   echo "find $SVN_BRANCH -name 5_changeLog.md"
-   siren_changelog=$(find $SVN_BRANCH -name 5_changeLog.md)
+   echo "find $SVN_BRANCHE -name 5_changeLog.md"
+   siren_changelog=$(find $SVN_BRANCHE -name 5_changeLog.md)
    echo "siren_changelog : $siren_changelog"
    if [ ! -z ${siren_changelog} ] ; then
       echo "sed -i "/@tableofcontents/r LOGMSG" ${siren_changelog}"

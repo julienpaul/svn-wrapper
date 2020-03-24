@@ -4,7 +4,7 @@
 #  to update SVN keyword Revision, Date,...
 #set -x
 for ff in global.f90 Doxyfile ; do
-   siren_file=$(find $SVN_BRANCH -name ${ff})
+   siren_file=$(find $SVN_BRANCHE -name ${ff})
    [ ! -z ${siren_file} ] && svn propset dummy 1 ${siren_file}
 done
 

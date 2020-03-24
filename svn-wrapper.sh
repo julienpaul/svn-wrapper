@@ -15,6 +15,7 @@ fi
 #
 # Setup local var
 #
+HERE=$(pwd)
 export GREP=$(which grep)
 
 #
@@ -82,6 +83,31 @@ export SVN_URL=$(env LANG=C $SVN info | $GREP 'URL:' | awk '{print $2}' | xargs)
 # Setup SVN revision
 #
 export SVN_REV=$(env LANG=C $SVN info | $GREP 'Revision:' | awk '{print $2}' | xargs)
+
+#
+# Setup SVN repository branch path
+#
+_svn_branche()
+{
+   text=$HERE
+   list="branches branche branch trunk tag tags"
+   # add upper case to list
+   list="$list $(echo "$list" | tr '[:lower:]' '[:upper:]')"
+   for search in $list ; do
+      # look for 'search' element in path
+      if $(echo $text | grep -q "/$search/") ; then
+         # 'prefix' contain path until 'search' element (not include)
+         prefix=${text%%$search*}
+         # add 2 subdirectories to get the path we looking for
+         n=$(( $(echo $prefix | tr -dc / | wc -c) + 2))
+         echo $text | cut -d"/" -f1-$n
+         exit 0
+      fi
+   done
+   # if no list element in path, keep it
+   echo $text
+}
+SVN_BRANCHE=$(_svn_branche)
 
 #
 # Hook dirs
@@ -291,7 +317,7 @@ action="$1"
 echo -e "\nSVN            : $SVN"
 echo -e "SVN_WRAPPER    : $SVN_WRAPPER"
 echo -e "SVN_ROOT       : $SVN_ROOT"
-echo -e "SVN_BRANCH     : $SVN_BRANCH"
+echo -e "SVN_BRANCHE    : $SVN_BRANCHE"
 echo -e "SVN_REPO_ROOT  : $SVN_REPO_ROOT"
 echo -e "SVN_REPO_URL   : $SVN_URL"
 echo -e "HOOK_DIR       : $HOOK_DIR\n"
