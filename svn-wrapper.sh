@@ -33,6 +33,15 @@ fi
 # Setup real svn
 #
 export SVN=$(which -a svn | $GREP -v "\\$ME" | head -n1)
+if [[ $($SVN --version --quiet | cut -d'.' -f1-2) > 1.6 ]] ; then
+   # svn 1.7 or upper :
+   #  .svn directory only in SVN_ROOT directory
+   export SVN_VRS=1.7
+else
+   # svn 1.6 or lower :
+   #  .svn directories in all subdirectories of SVN tree
+   export SVN_VRS=1.6
+fi
 
 #
 # Setup SVN wrapper directory
@@ -44,39 +53,39 @@ export SVN_WRAPPER=$(dirname $ME)
 #
 _svn_root()
 {
-   # if the current folder is not under svn revision control, nothing is output          
-   # and a non-zero exit value is given                                                  
-   if $(\svn info &> /dev/null) ; then                                                   
-      # current folder is under svn revision                                             
-      if [[ $(\svn --version --quiet | cut -d'.' -f1-2) > 1.6 ]] ; then                  
-         # svn 1.7 or upper :                                                            
-         #  .svn directory only in SVN_ROOT directory                                    
+   # if the current folder is not under svn revision control, nothing is output
+   # and a non-zero exit value is given
+   if $($SVN info &> /dev/null) ; then
+      # current folder is under svn revision
+      if [[ $SVN_VRS > 1.6 ]] ; then
+         # svn 1.7 or upper :
+         #  .svn directory only in SVN_ROOT directory
          echo $(env LANG=C $SVN info | $GREP 'Root Path:' | awk -F: '{print $2}' | xargs)
-      else                                                                               
-         # svn 1.6 or lower :                                                            
-         #  .svn directories in all subdirectories of SVN tree                           
-         
-         # this command outputs the top-most parent of                                   
-         # the current folder that is still                                                                                                                                     
-         # under svn revision control to standard out                                    
-         
-         parent=""                                                                       
-         grandparent="."                                                                 
-         
-         while [ -d "$grandparent/.svn" ]; do                                            
-            parent=$grandparent                                                          
-            grandparent="$parent/.."                                                     
-         done                                                                            
-         
-         if [ ! -z "$parent" ]; then                                                     
-            echo $(readlink -m "$parent")                                                
-         else                                                                            
-            exit 1                                                                       
-         fi                                                                              
-      fi                                                                                 
-   else                                                                                  
-      exit 1                                                                            
-   fi        
+      else
+         # svn 1.6 or lower :
+         #  .svn directories in all subdirectories of SVN tree
+
+         # this command outputs the top-most parent of
+         # the current folder that is still
+         # under svn revision control to standard out
+
+         parent=""
+         grandparent="."
+
+         while [ -d "$grandparent/.svn" ]; do
+            parent=$grandparent
+            grandparent="$parent/.."
+         done
+
+         if [ ! -z "$parent" ]; then
+            echo $(readlink -m "$parent")
+         else
+            exit 1
+         fi
+      fi
+   else
+      exit 1
+   fi
 }
 #
 export SVN_ROOT=$(_svn_root)
@@ -234,7 +243,15 @@ modify_args()
             local ext
             # Skip spaces changes only for terminal output
             [ $IS_TERMINAL -eq 1 ] && ext="bpu" || ext="pu"
-            ACT_ARGS=( "${ACT_ARGS[@]}" "-x" "-$ext" "--internal-diff" )
+            if [[ $SVN_VRS > 1.6 ]] ; then
+               # svn 1.7 or upper :
+               #  .svn directory only in SVN_ROOT directory
+               ACT_ARGS=( "${ACT_ARGS[@]}" "-x" "-$ext" "--internal-diff" )
+            else
+               # svn 1.6 or lower :
+               #  .svn directories in all subdirectories of SVN tree
+               ACT_ARGS=( "${ACT_ARGS[@]}" "-x" "-$ext")
+            fi
         ;;
     esac
 }

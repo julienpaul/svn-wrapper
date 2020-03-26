@@ -57,7 +57,15 @@ mkdir -p "${patchdir}" || err 1 "Impossible to create the patch directory"
 
 _svn_strip_count()
 {
-    echo $svnrelative | sed -n "s;$svnroot\(.*\);\1;p" | xargs | tr -dc / | wc -c
+    if [[ $SVN_VRS > 1.6 ]] ; then
+       # svn 1.7 or upper :
+       #  .svn directory only in SVN_ROOT directory
+       echo $svnrelative | sed -n "s;$svnroot\(.*\);\1;p" | xargs | tr -dc / | wc -c
+    else
+       # svn 1.6 or lower :
+       #  .svn directories in all subdirectories of SVN tree
+       echo $(($(echo $svnrelative | sed -n "s;$svnroot\(.*\);\1;p" | xargs | tr -dc / | wc -c)+1))
+    fi
 }
 
 _vcs_git_update()
@@ -357,7 +365,25 @@ _save()
 
     # Process lists
     if [ -f "$diff_list" ]; then
-        svn diff --git $(cat "$diff_list") >> "${diff}"
+        if [[ $SVN_VRS > 1.6 ]] ; then
+           # svn 1.7 or upper :
+           #  .svn directory only in SVN_ROOT directory
+           $SVN diff --git $(cat "$diff_list") >> "${diff}"
+        else
+           # svn 1.6 or lower :
+           #  .svn directories in all subdirectories of SVN tree
+           for file in $(cat "$diff_list") ; do
+                $SVN diff $file > "diff.tmp"
+                ff=$($GREP "^+++" diff.tmp | sed -e "s/[[:space:]]\+/ /g" | cut -d' ' -f2)
+                dir=$(echo $svnrelative | sed -n "s;$svnroot\(.*\);\1;p")
+                sed -i "/^=./a\\diff --git a$dir/$ff b$dir/$ff" diff.tmp
+                sed -i -e "s;\(^\-.*\)\($ff\)\(.*\);\1a$dir/\2\3;" \
+                       -e "s;\(^\+.*\)\($ff\)\(.*\);\1b$dir/\2\3;" \
+                    diff.tmp
+                cat diff.tmp >> "${diff}"
+           done
+           rm -f diff.tmp
+        fi
         _history_restore_script "${diff}" >> "${hist_script}"
         _fix_svn_git_patch "${diff}" >> "${diff_fixed}"
         cat "$diff_list" >> "$revert_list"
@@ -531,7 +557,16 @@ _apply_lite2() {
         fixed="${patch}/fixed_patch.diff.tmp"
 
         _fix_svn_git_patch "${changes}" > "${fixed}"
-        svn patch --strip ${svnstrip} "${fixed}"
+        if [[ $SVN_VRS > 1.6 ]] ; then
+           # svn 1.7 or upper :
+           #  .svn directory only in SVN_ROOT directory
+           svn patch --strip ${svnstrip} "${fixed}"
+        else
+           # svn 1.6 or lower :
+           #  .svn directories in all subdirectories of SVN tree
+           echo "patch --strip ${svnstrip} < ${fixed}"
+           patch --strip ${svnstrip} < "${fixed}"
+        fi
         rm -f "${fixed}"
     fi
 
