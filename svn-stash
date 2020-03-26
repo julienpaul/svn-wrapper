@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -e
+#set -x
 
 err()
 {
@@ -36,11 +37,11 @@ help    - show help" >&2
 
 export LC_ALL=C
 
-[ -x `which svn` ] || err 1 "svn is not installed on this system"
-svnroot=$(svn info 2>&1 | sed -n 's/Repository Root: \(.*\)/\1/p')
-svnrp=$(svn info 2>&1 | sed -n 's/Working Copy Root Path: \(.*\)/\1/p')
-svnrev=$(svn info 2>&1 | $GREP '^Revision: ' | cut -d ' ' -f 2)
-svnrelative=$(svn info 2>&1 | sed -n 's/URL: \(.*\)/\1/p')
+[ -x `which $SVN` ] || err 1 "svn is not installed on this system"
+svnroot=$SVN_REPO_ROOT
+svnrp=$SVN_ROOT
+svnrev=$SVN_REV
+svnrelative=$SVN_REPO_URL
 
 [ -d "${svnrp}" ] || err 1 "should be used inside a working copy"
 [ -w "${svnrp}/.svn" ] || err 1 "no write access to ${svnrp}/.svn"
@@ -254,7 +255,23 @@ _save()
     mkdir -p "${patch}"
 
     # Keep local relative path
-    realpath --relative-to="${svnrp}" "$(pwd)" > "${path_file}"
+    if [ "$REAL_PATH" = "y" ] ; then
+        realpath --relative-to="${svnrp}" "$(pwd)" > "${path_file}"
+    else
+        search=$(readlink -f $svnrp)
+        path=$(readlink -f $(pwd))
+        relative=$(echo $path | sed s,${search}/,,)
+        if [ "$relative" != "$path" ] ; then
+           result=$relative
+        else
+            while [ "$relative" == "$path" ] ; do
+               search=$(dirname $search)
+               relative=$(echo $path | sed s,${search}/,,)
+               [ -z $result ] && result=".." || result="${result}/.."
+            done
+        fi
+        echo "$result" > "${path_file}"
+    fi
 
     if [ -z "${files}" ]; then
         changes=$(svn st -q ${files})
@@ -290,7 +307,25 @@ _save()
         #   Handle binary files here too: `svn diff --git` creates good patch,
         #   but `svn patch` can't apply binary delta
         if [ "$type" = "?" -o "$enc" = "binary" ]; then
-            fname=`realpath -m --relative-to="$svnrp" -s -q $file`
+            if [ "$REAL_PATH" = "y" ] ; then
+                fname=$(realpath -m --relative-to="$svnrp" -s -q $file)
+            else
+                search=$(readlink -m -q $svnrp)
+                path=$(readlink -m -f $file)
+                relative=$(echo $path | sed s,${search}/,,)
+                if [ "$relative" != "$path" ] ; then
+                   result=$relative
+                else
+                    while [ "$relative" == "$path" ] ; do
+                       search=$(dirname $search)
+                       relative=$(echo $path | sed s,${search}/,,)
+                       [ -z $result ] && result=".." || result="${result}/.."
+                    done
+                    result="${result}/$(basename $path)"
+                fi
+                fname=$result
+            fi
+
             fdir=`dirname "${fname}"`
             fn=`basename "${fname}"`
             mkdir -p "${patch}/others/${fdir}"
@@ -300,8 +335,8 @@ _save()
             echo "${file}" >> "${revert_list}"
         fi
 
-        # Separate processing: 
-        #   handle binary files as a diff part too: 
+        # Separate processing:
+        #   handle binary files as a diff part too:
         #      meta data can be changed
         if [ "$type" != "?" ]; then
             if [ "$enc" = "binary" ]; then

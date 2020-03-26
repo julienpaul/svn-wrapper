@@ -12,16 +12,26 @@ else
     export IS_TERMINAL=0
 fi
 
+REAL_PATH="n"
+if which realpath > /dev/null 2>&1 ; then
+    REAL_PATH="y"
+fi
+
 #
 # Setup local var
 #
 HERE=$(pwd)
 export GREP=$(which grep)
 
+if [ "$REAL_PATH" = "y" ]; then
+   ME=$(realpath -sm $0)
+else
+   ME=$(readlink -m $0)
+fi
+
 #
 # Setup real svn
 #
-ME=$(realpath -sm $0)
 export SVN=$(which -a svn | $GREP -v "\\$ME" | head -n1)
 
 #
@@ -78,7 +88,7 @@ export SVN_REPO_ROOT=$(env LANG=C $SVN info | $GREP 'Repository Root:' | awk '{p
 #
 # Setup SVN repository url
 #
-export SVN_URL=$(env LANG=C $SVN info | $GREP 'URL:' | awk '{print $2}' | xargs)
+export SVN_REPO_URL=$(env LANG=C $SVN info | $GREP 'URL:' | awk '{print $2}' | xargs)
 #
 # Setup SVN revision
 #
@@ -95,7 +105,7 @@ _svn_branche()
    list="$list $(echo "$list" | tr '[:lower:]' '[:upper:]')"
    for search in $list ; do
       # look for 'search' element in path
-      if $(echo $text | grep -q "/$search/") ; then
+      if $(echo $text | $GREP -q "/$search/") ; then
          # 'prefix' contain path until 'search' element (not include)
          prefix=${text%%$search*}
          # add 2 subdirectories to get the path we looking for
@@ -171,12 +181,12 @@ run_hooks()
                     break
                 fi
             done
- 
+
             if [ -n "${svn_branch}" ]; then
                 local current_branch=$(svn_info_field 'Relative URL')
                 local svn_repo_hash=$(sha256sum <<< "$SVN_REPO_ROOT" | awk '{print $1}')
                 local branches_file="$HOME/.subversion/branches-${svn_repo_hash}.txt"
- 
+
                 [ -f "${branches_file}" ] && cp "${branches_file}" "${branches_file}.tmp"
                 echo "${current_brach}" >> "${branches_file}.tmp"
                 echo "${svn_branch}" >> "${branches_file}.tmp"
@@ -196,7 +206,7 @@ svn_list_branches()
 {
     local svn_repo_hash=$(sha256sum <<< "$SVN_REPO_ROOT" | awk '{print $1}')
     local branches_file="$HOME/.subversion/branches-${svn_repo_hash}.txt"
-    
+
     [ -f "${branches_file}" ] && cat "${branches_file}"
 }
 
@@ -267,10 +277,10 @@ svn_output_filter()
             if [ -f "$IGNORES_IN" ]; then
                 cat "$IGNORES_IN" | $GREP -v '^$' | $GREP -v '^#' > "$IGNORES"
 
-                REAL_PATH="n"
-                if which realpath > /dev/null; then
-                    REAL_PATH="y"
-                fi
+                #REAL_PATH="n"
+                #if which realpath > /dev/null; then
+                #    REAL_PATH="y"
+                #fi
 
                 while IFS='' read line;
                 do
@@ -283,9 +293,9 @@ svn_output_filter()
                     # Process only untracked files
                     if [ "$type" = "?" ]; then
                         if [ "$REAL_PATH" = "y" ]; then
-                            #set -x
-                            fn=`realpath -m --relative-to="$SVN_ROOT" -s -q "$fn"`
-                            #set +x
+                            fn=$(realpath -m --relative-to="$SVN_ROOT" -s -q "$fn")
+                        else
+                            fn=$(readlink -m ${SVN_ROOT} ${fn} | tail -1 | sed s,${SVN_ROOT}/,,)
                         fi
                         echo $fn | $GREP -f "$IGNORES" > /dev/null || echo "$line"
                     else
@@ -319,7 +329,7 @@ echo -e "SVN_WRAPPER    : $SVN_WRAPPER"
 echo -e "SVN_ROOT       : $SVN_ROOT"
 echo -e "SVN_BRANCHE    : $SVN_BRANCHE"
 echo -e "SVN_REPO_ROOT  : $SVN_REPO_ROOT"
-echo -e "SVN_REPO_URL   : $SVN_URL"
+echo -e "SVN_REPO_URL   : $SVN_REPO_URL"
 echo -e "HOOK_DIR       : $HOOK_DIR\n"
 echo -e "Revision       : $SVN_REV\n"
 #
