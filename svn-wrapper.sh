@@ -126,7 +126,7 @@ _svn_branche()
    # if no list element in path, keep it
    echo $text
 }
-SVN_BRANCHE=$(_svn_branche)
+export SVN_BRANCHE=$(_svn_branche)
 
 #
 # Hook dirs
@@ -245,11 +245,9 @@ modify_args()
             [ $IS_TERMINAL -eq 1 ] && ext="bpu" || ext="pu"
             if [[ $SVN_VRS > 1.6 ]] ; then
                # svn 1.7 or upper :
-               #  .svn directory only in SVN_ROOT directory
                ACT_ARGS=( "${ACT_ARGS[@]}" "-x" "-$ext" "--internal-diff" )
             else
                # svn 1.6 or lower :
-               #  .svn directories in all subdirectories of SVN tree
                ACT_ARGS=( "${ACT_ARGS[@]}" "-x" "-$ext")
             fi
         ;;

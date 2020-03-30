@@ -22,7 +22,8 @@ usage()
 Available cmds:
 ls      - display all stashed patshes
 show    - view a given patch
-save    - save a new patch or update existing one
+save    - save a new patch or add files to an existing one
+update  - update files already save in a stash
 apply   - apply a given patch
 pop     - apply a patch and delete it
 rm      - delete a given patch from the queue
@@ -40,11 +41,14 @@ export LC_ALL=C
 [ -x `which $SVN` ] || err 1 "svn is not installed on this system"
 svnroot=$SVN_REPO_ROOT
 svnrp=$SVN_ROOT
+svnbrch=$SVN_BRANCHE
 svnrev=$SVN_REV
 svnrelative=$SVN_REPO_URL
 
 [ -d "${svnrp}" ] || err 1 "should be used inside a working copy"
 [ -w "${svnrp}/.svn" ] || err 1 "no write access to ${svnrp}/.svn"
+
+[ -d "${svnbrch}" ] || err 1 "can not find branch repository ${svnbrch}"
 
 patchdir=${svnrp}/.svn/patches
 
@@ -59,11 +63,9 @@ _svn_strip_count()
 {
     if [[ $SVN_VRS > 1.6 ]] ; then
        # svn 1.7 or upper :
-       #  .svn directory only in SVN_ROOT directory
        echo $svnrelative | sed -n "s;$svnroot\(.*\);\1;p" | xargs | tr -dc / | wc -c
     else
        # svn 1.6 or lower :
-       #  .svn directories in all subdirectories of SVN tree
        echo $(($(echo $svnrelative | sed -n "s;$svnroot\(.*\);\1;p" | xargs | tr -dc / | wc -c)+1))
     fi
 }
@@ -125,6 +127,62 @@ _vcs_git_get_rev()
     git checkout master
     git branch -D ${branch}
 }
+
+_relative_path()
+{
+   local relativeto=$1
+   local fpath=$2
+
+    [ ! -d $relativeto ] && err 1 "can not find repertory $relativeto"
+    [ ! -f $fpath ] && [ ! -d $fpath ] && err 1 "can not find file or repository  $fpath"
+
+    local anchor=$(readlink -m -q ${relativeto})
+    local abspath=$(readlink -m -q $fpath)
+    local relative=$(echo $abspath | sed s,${anchor}/,,)
+    local backward=""
+    if [ "$relative" == "$abspath" ] ; then
+        while [ "$relative" == "$abspath" ] ; do
+           anchor=$(dirname $anchor)
+           relative=$(echo $abspath | sed s,${anchor}/,,)
+           backward="${backward}../"
+        done
+    fi
+
+    echo ${backward}${relative}
+}
+
+_chg_index_path()
+{
+    local fname tmp tmp2
+    local diff_list="$1"
+    local changes="$2"
+    local relative="$3"
+
+    tmp1=$(mktemp /tmp/XXXXXXXXXX)
+    tmp2=$(mktemp /tmp/XXXXXXXXXX)
+    trap "rm -f $tmp1 $tmp2" RETURN
+
+    cat $changes > $tmp1
+    for file in $(cat $diff_list) ; do
+        if [[ $SVN_VRS > 1.6 ]] ; then
+           # svn 1.7 or upper :
+           fname=$(realpath -m --relative-to="${relative}" "$file")
+        else
+           # svn 1.6 or lower :
+           fname=$(_relative "${relative}" "$file")
+        fi
+
+        awk -v a=$file -v b=$fname '
+        {
+           if (/^Index:/) {
+              gsub(a,b); print $0
+           } else {
+              print $0
+           }
+        }' $tmp1 > $tmp2 && mv $tmp2 $tmp1
+    done
+    cat $tmp1
+}   
 
 # Generate svn commands to restore history tracking for moved/copied files
 _history_restore_script()
@@ -230,19 +288,28 @@ _save()
                 if [ -z "$name" ]; then
                     name="$1"
                 else
-                    files="$files "$1""
+                    # use relative path to svnbrch
+                    if [ "$REAL_PATH" = "y" ] ; then
+                        fname=$(realpath -m --relative-to="$svnbrch" -s -q "$1")
+                    else
+                        fname=$(_relative_path "${svnbrch}" "$1")
+                    fi
+                    files="$files $fname"
                 fi
             ;;
         esac
         shift
     done
 
+    # go to branch repository 
+    cd ${svnbrch}
+
     [ -z "$name" ] && die 1 "No stash specified"
     [ ${name:0:1} = "." ] && err 1 "The stash name must not start with '.'"
 
     patch="${patchdir}/$name"
-    diff="${patch}/changes.diff"
-    diff_fixed="${patch}/changes_fixed.diff"
+    changes="${patch}/changes.diff"
+    changes_fixed="${patch}/changes_fixed.diff"
     others="${patch}/others.list"
     rev="${patch}/rev"
     diff_list="${patch}/diff.list"
@@ -266,32 +333,19 @@ _save()
     if [ "$REAL_PATH" = "y" ] ; then
         realpath --relative-to="${svnrp}" "$(pwd)" > "${path_file}"
     else
-        search=$(readlink -f $svnrp)
-        path=$(readlink -f $(pwd))
-        relative=$(echo $path | sed s,${search}/,,)
-        if [ "$relative" != "$path" ] ; then
-           result=$relative
-        else
-            while [ "$relative" == "$path" ] ; do
-               search=$(dirname $search)
-               relative=$(echo $path | sed s,${search}/,,)
-               [ -z $result ] && result=".." || result="${result}/.."
-            done
-        fi
-        echo "$result" > "${path_file}"
+        _relative_path "${svnrp}" "$(pwd)" > "${path_file}"
     fi
 
     if [ -z "${files}" ]; then
-        changes=$(svn st -q ${files})
-        [ "${changes}" != "" ] || err 1 "No changes to be saved"
+        # check current directory files
+        files=${cdir}
+        svnst=$(svn st -q ${files})
+        [ "${svnst}" != "" ] || err 1 "No changes to be saved"
         st_opt="-q"
     fi
 
     revert_list="${patch}/revert.list.tmp"
-
-    if [[ $updating == 1 ]]; then
-       rm -f "${others}" "${revert_list}"
-    fi
+    trap "rm -f '$revert_list'" RETURN
 
     echo ${svnrev} > "${rev}"
     svn st ${st_opt} ${files} | while IFS='' read line
@@ -316,22 +370,9 @@ _save()
         #   but `svn patch` can't apply binary delta
         if [ "$type" = "?" -o "$enc" = "binary" ]; then
             if [ "$REAL_PATH" = "y" ] ; then
-                fname=$(realpath -m --relative-to="$svnrp" -s -q $file)
+                fname=$(realpath -m --relative-to="$svnbrch" -s -q $file)
             else
-                search=$(readlink -m -q $svnrp)
-                path=$(readlink -m -f $file)
-                relative=$(echo $path | sed s,${search}/,,)
-                if [ "$relative" != "$path" ] ; then
-                   result=$relative
-                else
-                    while [ "$relative" == "$path" ] ; do
-                       search=$(dirname $search)
-                       relative=$(echo $path | sed s,${search}/,,)
-                       [ -z $result ] && result=".." || result="${result}/.."
-                    done
-                    result="${result}/$(basename $path)"
-                fi
-                fname=$result
+                fname=$(_relative_path "${svnbrch}" "$file")
             fi
 
             fdir=`dirname "${fname}"`
@@ -344,7 +385,7 @@ _save()
         fi
 
         # Separate processing:
-        #   handle binary files as a diff part too:
+        #   handle binary files as a changes part too:
         #      meta data can be changed
         if [ "$type" != "?" ]; then
             if [ "$enc" = "binary" ]; then
@@ -367,11 +408,9 @@ _save()
     if [ -f "$diff_list" ]; then
         if [[ $SVN_VRS > 1.6 ]] ; then
            # svn 1.7 or upper :
-           #  .svn directory only in SVN_ROOT directory
-           $SVN diff --git $(cat "$diff_list") >> "${diff}"
+           $SVN diff --git $(cat "$diff_list") >> "${changes}"
         else
            # svn 1.6 or lower :
-           #  .svn directories in all subdirectories of SVN tree
            for file in $(cat "$diff_list") ; do
                 $SVN diff $file > "diff.tmp"
                 ff=$($GREP "^+++" diff.tmp | sed -e "s/[[:space:]]\+/ /g" | cut -d' ' -f2)
@@ -380,13 +419,13 @@ _save()
                 sed -i -e "s;\(^\-.*\)\($ff\)\(.*\);\1a$dir/\2\3;" \
                        -e "s;\(^\+.*\)\($ff\)\(.*\);\1b$dir/\2\3;" \
                     diff.tmp
-                cat diff.tmp >> "${diff}"
+                cat diff.tmp >> "${changes}"
            done
            rm -f diff.tmp
         fi
-        _history_restore_script "${diff}" >> "${hist_script}"
-        _fix_svn_git_patch "${diff}" >> "${diff_fixed}"
         cat "$diff_list" >> "$revert_list"
+        _history_restore_script "${changes}" >> "${hist_script}"
+        _fix_svn_git_patch "${changes}" >> "${changes_fixed}"
     fi
 
     if [ -f "$revert_list" ]; then
@@ -518,7 +557,6 @@ show()
 _apply_lite2() {
     local patch="$1"
     [ -d "${patch}" ] || err 1 "$1: no such patch"
-    cd ${svnrp}
 
     local changes others patch_rev work_rev files other_files diff_list hist_script path_file svnstrip
 
@@ -527,10 +565,6 @@ _apply_lite2() {
     diff_list="${patch}/diff.list"
     hist_script="${patch}/hist.script"
     path_file="${patch}/path"
-
-    if [ -f "${path_file}" ]; then
-        cd "$(cat ${path_file})"
-    fi
 
     svnstrip=$(_svn_strip_count)
 
@@ -559,12 +593,9 @@ _apply_lite2() {
         _fix_svn_git_patch "${changes}" > "${fixed}"
         if [[ $SVN_VRS > 1.6 ]] ; then
            # svn 1.7 or upper :
-           #  .svn directory only in SVN_ROOT directory
            svn patch --strip ${svnstrip} "${fixed}"
         else
            # svn 1.6 or lower :
-           #  .svn directories in all subdirectories of SVN tree
-           echo "patch --strip ${svnstrip} < ${fixed}"
            patch --strip ${svnstrip} < "${fixed}"
         fi
         rm -f "${fixed}"
@@ -605,8 +636,6 @@ _vcs_apply()
 
     local patch="$(_get_patch $name)"
     [ -d "${patch}" ] || err 1 "$name: no such patch"
-
-    cd ${svnrp}
 
     shift
 
@@ -743,13 +772,14 @@ revert()
     patch=$(_get_patch $1)
     [ -z "$patch" -o -d "${patch}" ] || err 1 "$1: no such patch"
 
+    # go to branch repository 
+    cd ${svnbrch}
+
     others="${patch}/others.list"
     diff_list="${patch}/diff.list"
     revert_list="${patch}/revert.list.tmp"
 
     trap "rm -f '$revert_list'" RETURN
-
-    cd ${svnrp}
 
     local ask
     read -p "You run revert command. Are you shure? [yes/NO] " ask
@@ -799,6 +829,13 @@ update()
 
 cmd=$1
 [ -n "$1" ] && shift
+
+# set up current directory
+if [ "$REAL_PATH" = "y" ] ; then
+    cdir=$(realpath -m --relative-to="$svnbrch" -s -q $(pwd))
+else
+    cdir=$(_relative_path "${svnbrch}" "$(pwd)")
+fi
 
 case "$cmd" in
     ls) list "$@" ;;
