@@ -108,7 +108,7 @@ export SVN_REV=$(env LANG=C $SVN info | $GREP 'Revision:' | awk '{print $2}' | x
 #
 _svn_branche()
 {
-   text=$HERE
+   text=$1
    list="branches branche branch trunk tag tags"
    # add upper case to list
    list="$list $(echo "$list" | tr '[:lower:]' '[:upper:]')"
@@ -126,7 +126,8 @@ _svn_branche()
    # if no list element in path, keep it
    echo $text
 }
-export SVN_BRANCHE=$(_svn_branche)
+export SVN_BRANCHE=$(_svn_branche $HERE)
+export SVN_REPO_BRCH=$(_svn_branche $SVN_REPO_URL)
 
 #
 # Hook dirs
@@ -345,6 +346,7 @@ echo -e "SVN_ROOT       : $SVN_ROOT"
 echo -e "SVN_BRANCHE    : $SVN_BRANCHE"
 echo -e "SVN_REPO_ROOT  : $SVN_REPO_ROOT"
 echo -e "SVN_REPO_URL   : $SVN_REPO_URL"
+echo -e "SVN_REPO_BRCH  : $SVN_REPO_BRCH"
 echo -e "HOOK_DIR       : $HOOK_DIR\n"
 echo -e "Revision       : $SVN_REV\n"
 #

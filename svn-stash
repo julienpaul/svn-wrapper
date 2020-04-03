@@ -39,11 +39,12 @@ help    - show help" >&2
 export LC_ALL=C
 
 [ -x `which $SVN` ] || err 1 "svn is not installed on this system"
-svnroot=$SVN_REPO_ROOT
 svnrp=$SVN_ROOT
 svnbrch=$SVN_BRANCHE
 svnrev=$SVN_REV
-svnrelative=$SVN_REPO_URL
+
+svnroot=$SVN_REPO_ROOT
+svnrelative=$SVN_REPO_BRCH
 
 [ -d "${svnrp}" ] || err 1 "should be used inside a working copy"
 [ -w "${svnrp}/.svn" ] || err 1 "no write access to ${svnrp}/.svn"
@@ -138,17 +139,21 @@ _relative_path()
 
     local anchor=$(readlink -m -q ${relativeto})
     local abspath=$(readlink -m -q $fpath)
-    local relative=$(echo $abspath | sed s,${anchor}/,,)
-    local backward=""
-    if [ "$relative" == "$abspath" ] ; then
-        while [ "$relative" == "$abspath" ] ; do
-           anchor=$(dirname $anchor)
-           relative=$(echo $abspath | sed s,${anchor}/,,)
-           backward="${backward}../"
-        done
-    fi
+    if [ "$anchor" != "$abspath" ] ; then
+      local relative=$(echo $abspath | sed s,${anchor}/,,)
+      local backward=""
+      if [ "$relative" = "$abspath" ] ; then
+          while [ "$relative" = "$abspath" ] ; do
+             anchor=$(dirname $anchor)
+             relative=$(echo $abspath | sed s,${anchor}/,,)
+             backward="${backward}../"
+          done
+      fi
 
-    echo ${backward}${relative}
+      echo ${backward}${relative}
+   else
+      echo "."
+   fi
 }
 
 _chg_index_path()
@@ -182,7 +187,7 @@ _chg_index_path()
         }' $tmp1 > $tmp2 && mv $tmp2 $tmp1
     done
     cat $tmp1
-}   
+}
 
 # Generate svn commands to restore history tracking for moved/copied files
 _history_restore_script()
@@ -301,7 +306,7 @@ _save()
         shift
     done
 
-    # go to branch repository 
+    # go to branch repository
     cd ${svnbrch}
 
     [ -z "$name" ] && die 1 "No stash specified"
@@ -772,7 +777,7 @@ revert()
     patch=$(_get_patch $1)
     [ -z "$patch" -o -d "${patch}" ] || err 1 "$1: no such patch"
 
-    # go to branch repository 
+    # go to branch repository
     cd ${svnbrch}
 
     others="${patch}/others.list"
@@ -836,7 +841,6 @@ if [ "$REAL_PATH" = "y" ] ; then
 else
     cdir=$(_relative_path "${svnbrch}" "$(pwd)")
 fi
-
 case "$cmd" in
     ls) list "$@" ;;
     show|save|apply|pop|list|log|revert|update) $cmd "$@" ;;
